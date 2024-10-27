@@ -2,9 +2,10 @@ import * as vscode from 'vscode';
 import { FileSystemScanner } from './core/fileSystem/scanner';
 import { FileSystemStorage } from './core/fileSystem/storage';
 import { FileExplorerProvider } from './view/fileExplorer';
-
 import { AIConfig } from './core/ai/config';
 import { ChatViewProvider } from './webview/chat';
+import { CurrentFileProvider, registerJumpToLineCommand } from './view/currentFileView';
+import { TypeScriptSymbolProvider } from './core/fileStructure/symbolProvider';
 
 export function activate(context: vscode.ExtensionContext) { 
     console.log('Congratulations, your extension "ai-assistant" is now active!');
@@ -19,6 +20,31 @@ export function activate(context: vscode.ExtensionContext) {
     // 註冊聊天視圖
     const chatViewProvider = new ChatViewProvider(context.extensionUri, context);
     vscode.window.registerWebviewViewProvider('aiAssistantChat', chatViewProvider);
+
+    // 註冊 TypeScript/JavaScript 符號提供器
+    const symbolProvider = new TypeScriptSymbolProvider();
+    const supportedLanguages = [
+        'typescript',
+        'typescriptreact',
+        'javascript',
+        'javascriptreact'
+    ];
+
+    supportedLanguages.forEach(language => {
+        const disposable = vscode.languages.registerDocumentSymbolProvider(
+            { scheme: 'file', language },
+            symbolProvider
+        );
+        context.subscriptions.push(disposable);
+    });
+
+    // 註冊當前文件結構視圖
+    const currentFileProvider = new CurrentFileProvider();
+    vscode.window.registerTreeDataProvider('aiAssistantCurrentFile', currentFileProvider);
+
+    // 註冊跳轉命令
+    const jumpToLineCommand = registerJumpToLineCommand();
+    context.subscriptions.push(jumpToLineCommand);
 
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
     statusBarItem.text = "$(file-directory) AI Assistant";
@@ -58,6 +84,20 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('Chat history cleared!');
     });
 
+    // 添加文件焦點變化監聽
+    vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+        if (editor) {
+            currentFileProvider.refresh(editor.document);
+        }
+    });
+
+    // 添加文件內容變化監聽
+    vscode.workspace.onDidChangeTextDocument(async (event) => {
+        if (event.document === vscode.window.activeTextEditor?.document) {
+            currentFileProvider.refresh(event.document);
+        }
+    });
+
     context.subscriptions.push(
         scanCommand,
         showExplorerCommand,
@@ -65,6 +105,11 @@ export function activate(context: vscode.ExtensionContext) {
         clearChatCommand,
         statusBarItem
     );
+
+    // 初始化當前文件結構（如果有開啟的編輯器）
+    if (vscode.window.activeTextEditor) {
+        currentFileProvider.refresh(vscode.window.activeTextEditor.document);
+    }
 
     // 自動掃描工作區
     vscode.commands.executeCommand('ai-assistant.scanWorkspace');

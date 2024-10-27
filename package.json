@@ -76,6 +76,15 @@
           "visibility": "visible"
         },
         {
+          "type": "tree",
+          "id": "aiAssistantCurrentFile",
+          "name": "Current File",
+          "icon": "$(symbol-structure)",
+          "contextualTitle": "Current File Structure",
+          "visibility": "visible",
+          "when": "editorIsOpen"
+        },
+        {
           "type": "webview",
           "id": "aiAssistantChat",
           "name": "Chat",
