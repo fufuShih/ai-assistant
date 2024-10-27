@@ -9,15 +9,39 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
-      {
-        "command": "ai-assistant.scanWorkspace",
-        "title": "AI Assistant: Scan Workspace"
-      }
-    ]
+        {
+            "command": "ai-assistant.scanWorkspace",
+            "title": "AI Assistant: Scan Workspace"
+        },
+        {
+            "command": "ai-assistant.showExplorer",
+            "title": "AI Assistant: Show File Explorer"
+        }
+    ],
+    "viewsContainers": {
+        "activitybar": [
+            {
+                "id": "aiAssistant",
+                "title": "AI Assistant",
+                "icon": "resources/robot-icon.svg"
+            }
+        ]
+    },
+    "views": {
+        "aiAssistant": [
+            {
+                "id": "aiAssistantExplorer",
+                "name": "File Explorer",
+                "contextualTitle": "AI Assistant Files"
+            }
+        ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run compile",
