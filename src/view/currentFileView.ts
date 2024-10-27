@@ -31,9 +31,86 @@ export class CurrentFileProvider implements vscode.TreeDataProvider<StructureTre
         });
     }
 
-    public refresh(document: vscode.TextDocument): void {
-        this.currentDocument = document;
-        this.updateStructure();
+    public async refresh(document: vscode.TextDocument): Promise<void> {
+      console.log(`Refreshing file structure for: ${document.fileName}`);
+      
+      try {
+          // 清除現有數據
+          this.nodes = [];
+          this._onDidChangeTreeData.fire();
+
+          // 設置新文件
+          this.currentDocument = document;
+          
+          // 如果文件類型支援，則更新結構
+          if (this.isRelevantDocument(document)) {
+              console.log('Parsing document structure...');
+              try {
+                  // 獲取文件符號
+                  const symbolResults = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+                      'vscode.executeDocumentSymbolProvider',
+                      document.uri
+                  );
+
+                  if (symbolResults && symbolResults.length > 0) {
+                      console.log(`Found ${symbolResults.length} symbols`);
+                      this.nodes = await FileStructureParser.parse(document);
+                  } else {
+                      console.log('No symbols found, trying alternative method...');
+                      // 嘗試使用語言服務
+                      const symbols = await vscode.languages.getLanguages().then(async languages => {
+                          if (languages.includes(document.languageId)) {
+                              return vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+                                  'vscode.executeDocumentSymbolProvider',
+                                  document.uri,
+                                  { language: document.languageId }
+                              );
+                          }
+                          return null;
+                      });
+
+                      if (symbols) {
+                          this.nodes = await FileStructureParser.parse(document);
+                      }
+                  }
+              } catch (error) {
+                  console.error('Error getting symbols:', error);
+              }
+          } else {
+              console.log('Document type not supported:', document.languageId);
+          }
+
+          console.log(`Refreshed with ${this.nodes.length} nodes`);
+      } catch (error) {
+          console.error('Error refreshing file structure:', error);
+          this.nodes = [];
+      }
+
+      // 通知視圖更新
+      this._onDidChangeTreeData.fire();
+    }
+
+    private isRelevantDocument(document: vscode.TextDocument): boolean {
+      const supportedLanguages = [
+          'typescript',
+          'typescriptreact',
+          'javascript',
+          'javascriptreact',
+          'python',
+          'java',
+          'csharp',
+          'cpp',
+          'c',
+          'ruby',
+          'php',
+          'go',
+          'rust',
+          'swift',
+          'kotlin'
+      ];
+      const isSupported = supportedLanguages.includes(document.languageId);
+      console.log(`Document language: ${document.languageId}, Supported: ${isSupported}`);
+      return isSupported;
     }
 
     private async updateStructure(): Promise<void> {
@@ -49,14 +126,6 @@ export class CurrentFileProvider implements vscode.TreeDataProvider<StructureTre
             this.nodes = [];
             this._onDidChangeTreeData.fire();
         }
-    }
-
-    private isRelevantDocument(document: vscode.TextDocument): boolean {
-        const supportedLanguages = [
-            'typescript', 'typescriptreact',
-            'javascript', 'javascriptreact'
-        ];
-        return supportedLanguages.includes(document.languageId);
     }
 
     getTreeItem(element: StructureTreeItem): vscode.TreeItem {

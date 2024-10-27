@@ -54,8 +54,22 @@
       {
         "command": "ai-assistant.clearChat",
         "title": "AI Assistant: Clear Chat History"
+      },
+      {
+        "command": "ai-assistant.refreshCurrentFile",
+        "title": "Refresh Current File Structure",
+        "icon": "$(sync-spin)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "ai-assistant.refreshCurrentFile",
+          "when": "view == aiAssistantCurrentFile",
+          "group": "navigation"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {
@@ -97,6 +111,8 @@
   "scripts": {
     "vscode:prepublish": "pnpm run compile",
     "compile": "tsc -p ./",
+    "clean": "rimraf ./out",
+    "build": "pnpm run clean && pnpm run compile",
     "watch": "tsc -watch -p ./",
     "pretest": "pnpm run compile && pnpm run lint",
     "lint": "eslint src",
@@ -115,6 +131,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
-    "openai": "^4.68.4"
+    "openai": "^4.68.4",
+    "rimraf": "^6.0.1"
   }
 }

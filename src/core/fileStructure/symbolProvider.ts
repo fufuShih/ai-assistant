@@ -7,117 +7,178 @@ export class TypeScriptSymbolProvider implements vscode.DocumentSymbolProvider {
         token: vscode.CancellationToken
     ): Promise<vscode.DocumentSymbol[]> {
         try {
-            // 使用 VS Code 內建的符號提供器
-            const builtInSymbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+            // 檢查文件是否有效
+            if (!document) {
+                console.log('No active document');
+                return [];
+            }
+
+            console.log(`Providing symbols for ${document.fileName} (${document.languageId})`);
+
+            // 直接使用 VS Code 內建的語言服務
+            const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
                 'vscode.executeDocumentSymbolProvider',
                 document.uri
             );
 
-            if (!builtInSymbols) {
-                console.log('No symbols found');
-                return [];
+            if (!symbols || symbols.length === 0) {
+                console.log('No symbols found by VS Code provider');
+                // 嘗試使用備用的符號提供方式
+                return await this.getSymbolsFromLanguageFeatures(document);
             }
 
-            console.log(`Found ${builtInSymbols.length} symbols in ${document.fileName}`);
-            
-            // 過濾並整理符號
-            return this.processSymbols(builtInSymbols);
+            console.log(`Found ${symbols.length} symbols`);
+            return this.processSymbols(symbols);
         } catch (error) {
             console.error('Error providing symbols:', error);
             return [];
         }
     }
 
-    private processSymbols(symbols: vscode.DocumentSymbol[]): vscode.DocumentSymbol[] {
-        return symbols
-            .filter(symbol => this.isRelevantSymbol(symbol))
-            .map(symbol => {
-                // 如果有子符號，遞迴處理
-                if (symbol.children && symbol.children.length > 0) {
-                    symbol.children = this.processSymbols(symbol.children);
+    private async getSymbolsFromLanguageFeatures(document: vscode.TextDocument): Promise<vscode.DocumentSymbol[]> {
+        try {
+            // 使用 TypeScript 語言服務
+            const symbols = await vscode.languages.getLanguages().then(async languages => {
+                if (languages.includes(document.languageId)) {
+                    return vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+                        'vscode.executeDocumentSymbolProvider',
+                        document.uri,
+                        { language: document.languageId }
+                    );
                 }
-                return this.enhanceSymbol(symbol);
-            })
-            .sort((a, b) => a.range.start.line - b.range.start.line);
+                return null;
+            });
+
+            if (symbols) {
+                console.log('Found symbols using language features');
+                return this.processSymbols(symbols);
+            }
+        } catch (error) {
+            console.error('Error getting symbols from language features:', error);
+        }
+        return [];
+    }
+
+    private processSymbols(symbols: vscode.DocumentSymbol[]): vscode.DocumentSymbol[] {
+        try {
+            return symbols
+                .filter(symbol => this.isRelevantSymbol(symbol))
+                .map(symbol => {
+                    // 遞迴處理子符號
+                    if (symbol.children?.length > 0) {
+                        symbol.children = this.processSymbols(symbol.children);
+                    }
+                    return this.enhanceSymbol(symbol);
+                })
+                .sort((a, b) => a.range.start.line - b.range.start.line);
+        } catch (error) {
+            console.error('Error processing symbols:', error);
+            return symbols;
+        }
     }
 
     private enhanceSymbol(symbol: vscode.DocumentSymbol): vscode.DocumentSymbol {
-        // 為符號添加額外信息
-        let detail = '';
-        
-        switch (symbol.kind) {
-            case vscode.SymbolKind.Function:
-                detail = '(function)';
-                break;
-            case vscode.SymbolKind.Method:
-                detail = '(method)';
-                break;
-            case vscode.SymbolKind.Property:
-                detail = '(property)';
-                break;
-            case vscode.SymbolKind.Variable:
-                detail = '(variable)';
-                break;
-            case vscode.SymbolKind.Class:
-                detail = '(class)';
-                break;
-            case vscode.SymbolKind.Interface:
-                detail = '(interface)';
-                break;
-            case vscode.SymbolKind.Constructor:
-                detail = '(constructor)';
-                break;
-        }
+        try {
+            // 添加特定類型的處理
+            if (this.isReactComponent(symbol)) {
+                symbol.detail = '(React Component)';
+            } else if (this.isReactHook(symbol)) {
+                symbol.detail = '(React Hook)';
+            } else {
+                symbol.detail = `(${vscode.SymbolKind[symbol.kind].toLowerCase()})`;
+            }
 
-        symbol.detail = detail;
-        return symbol;
+            return symbol;
+        } catch (error) {
+            console.error('Error enhancing symbol:', error);
+            return symbol;
+        }
     }
 
     private isRelevantSymbol(symbol: vscode.DocumentSymbol): boolean {
-        const relevantKinds = [
-            vscode.SymbolKind.Class,
-            vscode.SymbolKind.Interface,
-            vscode.SymbolKind.Function,
-            vscode.SymbolKind.Method,
-            vscode.SymbolKind.Property,
-            vscode.SymbolKind.Variable,
-            vscode.SymbolKind.Constructor,
-            vscode.SymbolKind.Enum,
-            vscode.SymbolKind.Field,
+        // 包含所有可能的符號類型
+        const relevantKinds = new Set([
+            vscode.SymbolKind.File,
             vscode.SymbolKind.Module,
             vscode.SymbolKind.Namespace,
             vscode.SymbolKind.Package,
+            vscode.SymbolKind.Class,
+            vscode.SymbolKind.Method,
+            vscode.SymbolKind.Property,
+            vscode.SymbolKind.Field,
+            vscode.SymbolKind.Constructor,
+            vscode.SymbolKind.Enum,
+            vscode.SymbolKind.Interface,
+            vscode.SymbolKind.Function,
+            vscode.SymbolKind.Variable,
+            vscode.SymbolKind.Constant,
+            vscode.SymbolKind.String,
+            vscode.SymbolKind.Number,
+            vscode.SymbolKind.Boolean,
+            vscode.SymbolKind.Array,
+            vscode.SymbolKind.Object,
+            vscode.SymbolKind.Key,
+            vscode.SymbolKind.Event,
             vscode.SymbolKind.TypeParameter
-        ];
+        ]);
 
-        // React 組件特殊處理
-        if (
-            (symbol.kind === vscode.SymbolKind.Function || 
-             symbol.kind === vscode.SymbolKind.Variable) &&
-            /^[A-Z]/.test(symbol.name)
-        ) {
-            return true;
-        }
+        return (
+            relevantKinds.has(symbol.kind) ||
+            this.isReactComponent(symbol) ||
+            this.isReactHook(symbol)
+        );
+    }
 
-        return relevantKinds.includes(symbol.kind);
+    private isReactComponent(symbol: vscode.DocumentSymbol): boolean {
+        // 檢查是否是 React 組件（以大寫字母開頭的函數或變量）
+        return (
+            (symbol.kind === vscode.SymbolKind.Function ||
+             symbol.kind === vscode.SymbolKind.Variable ||
+             symbol.kind === vscode.SymbolKind.Class) &&
+            /^[A-Z][A-Za-z0-9]*$/.test(symbol.name)
+        );
+    }
+
+    private isReactHook(symbol: vscode.DocumentSymbol): boolean {
+        // 檢查是否是 React Hook
+        return (
+            symbol.kind === vscode.SymbolKind.Function &&
+            symbol.name.startsWith('use') &&
+            /^use[A-Z]/.test(symbol.name)
+        );
     }
 }
 
 export function registerSymbolProvider(context: vscode.ExtensionContext): void {
-    // 註冊符號提供器
-    const supportedLanguages = [
-        { language: 'typescript', scheme: 'file' },
-        { language: 'typescriptreact', scheme: 'file' },
-        { language: 'javascript', scheme: 'file' },
-        { language: 'javascriptreact', scheme: 'file' }
-    ];
+    try {
+        const provider = new TypeScriptSymbolProvider();
+        
+        // 註冊所有支援的語言
+        const disposable = vscode.languages.registerDocumentSymbolProvider(
+            [
+                { scheme: 'file', language: 'typescript' },
+                { scheme: 'file', language: 'typescriptreact' },
+                { scheme: 'file', language: 'javascript' },
+                { scheme: 'file', language: 'javascriptreact' }
+            ],
+            provider
+        );
 
-    const symbolProvider = new TypeScriptSymbolProvider();
-    
-    const registration = vscode.languages.registerDocumentSymbolProvider(
-        supportedLanguages,
-        symbolProvider
-    );
-
-    context.subscriptions.push(registration);
+        context.subscriptions.push(disposable);
+        
+        // 添加額外的語言支援
+        vscode.languages.getLanguages().then(languages => {
+            languages.forEach(language => {
+                if (!['typescript', 'typescriptreact', 'javascript', 'javascriptreact'].includes(language)) {
+                    const disposable = vscode.languages.registerDocumentSymbolProvider(
+                        { scheme: 'file', language },
+                        provider
+                    );
+                    context.subscriptions.push(disposable);
+                }
+            });
+        });
+    } catch (error) {
+        console.error('Error registering symbol provider:', error);
+    }
 }
