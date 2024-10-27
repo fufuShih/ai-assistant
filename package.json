@@ -57,8 +57,8 @@
       },
       {
         "command": "ai-assistant.refreshCurrentFile",
-        "title": "Refresh Current File Structure",
-        "icon": "$(sync-spin)"
+        "title": "Refresh",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -66,7 +66,14 @@
         {
           "command": "ai-assistant.refreshCurrentFile",
           "when": "view == aiAssistantCurrentFile",
-          "group": "navigation"
+          "group": "navigation@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "ai-assistant.refreshCurrentFile",
+          "when": "view == aiAssistantCurrentFile",
+          "group": "inline"
         }
       ]
     },
