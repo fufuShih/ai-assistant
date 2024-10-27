@@ -14,33 +14,75 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [
-        {
-            "command": "ai-assistant.scanWorkspace",
-            "title": "AI Assistant: Scan Workspace"
+    "configuration": {
+      "title": "AI Assistant",
+      "properties": {
+        "aiAssistant.openai.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI API Key"
         },
-        {
-            "command": "ai-assistant.showExplorer",
-            "title": "AI Assistant: Show File Explorer"
+        "aiAssistant.anthropic.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Anthropic API Key"
+        },
+        "aiAssistant.defaultProvider": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "anthropic"
+          ],
+          "default": "openai",
+          "description": "Default AI Provider"
         }
+      }
+    },
+    "commands": [
+      {
+        "command": "ai-assistant.scanWorkspace",
+        "title": "AI Assistant: Scan Workspace"
+      },
+      {
+        "command": "ai-assistant.showExplorer",
+        "title": "AI Assistant: Show File Explorer"
+      },
+      {
+        "command": "ai-assistant.checkConfig",
+        "title": "AI Assistant: Check AI Configuration"
+      },
+      {
+        "command": "ai-assistant.clearChat",
+        "title": "AI Assistant: Clear Chat History"
+      }
     ],
     "viewsContainers": {
-        "activitybar": [
-            {
-                "id": "aiAssistant",
-                "title": "AI Assistant",
-                "icon": "resources/robot-icon.svg"
-            }
-        ]
+      "activitybar": [
+        {
+          "id": "aiAssistant",
+          "title": "AI Assistant",
+          "icon": "resources/robot-icon.svg"
+        }
+      ]
     },
     "views": {
-        "aiAssistant": [
-            {
-                "id": "aiAssistantExplorer",
-                "name": "File Explorer",
-                "contextualTitle": "AI Assistant Files"
-            }
-        ]
+      "aiAssistant": [
+        {
+          "type": "tree",
+          "id": "aiAssistantFiles",
+          "name": "Files",
+          "icon": "$(files)",
+          "contextualTitle": "AI Assistant Files",
+          "visibility": "visible"
+        },
+        {
+          "type": "webview",
+          "id": "aiAssistantChat",
+          "name": "Chat",
+          "icon": "$(comment-discussion)",
+          "visibility": "visible"
+        }
+      ]
     }
   },
   "scripts": {
@@ -52,14 +94,18 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.94.0",
     "@types/mocha": "^10.0.9",
     "@types/node": "20.x",
+    "@types/vscode": "^1.94.0",
     "@typescript-eslint/eslint-plugin": "^8.10.0",
     "@typescript-eslint/parser": "^8.7.0",
-    "eslint": "^9.13.0",
-    "typescript": "^5.6.3",
     "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1"
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.13.0",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.1",
+    "openai": "^4.68.4"
   }
 }
