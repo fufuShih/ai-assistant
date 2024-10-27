@@ -14,8 +14,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "ai-assistant.helloWorld",
-        "title": "Hello World"
+        "command": "ai-assistant.scanWorkspace",
+        "title": "AI Assistant: Scan Workspace"
       }
     ]
   },
