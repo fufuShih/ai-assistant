@@ -1,43 +1,74 @@
-// src/core/fileStructure/parser.ts
 import * as vscode from 'vscode';
+import { TypeScriptSymbolProvider } from './symbolProvider';
+
+export type StructureNodeType = 'class' | 'function' | 'interface' | 'variable' | 'namespace' | 'enum';
 
 export interface IStructureNode {
     name: string;
-    detail?: string;
+    type: StructureNodeType;
     range: vscode.Range;
-    kind: vscode.SymbolKind;
     children?: IStructureNode[];
 }
 
 export class FileStructureParser {
+    private static readonly typeScriptKinds = new Map<vscode.SymbolKind, StructureNodeType>([
+        [vscode.SymbolKind.Class, 'class'],
+        [vscode.SymbolKind.Method, 'function'],
+        [vscode.SymbolKind.Function, 'function'],
+        [vscode.SymbolKind.Variable, 'variable'],
+        [vscode.SymbolKind.Interface, 'interface'],
+        [vscode.SymbolKind.Namespace, 'namespace'],
+        [vscode.SymbolKind.Enum, 'enum'],
+        [vscode.SymbolKind.Constructor, 'function']
+    ]);
+
+    private static symbolProvider = new TypeScriptSymbolProvider();
+
     public static async parse(document: vscode.TextDocument): Promise<IStructureNode[]> {
         try {
-            // 直接使用 VS Code 的符號提供器
-            const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
-                'vscode.executeDocumentSymbolProvider',
-                document.uri
+            console.log('Parsing document:', document.fileName);
+
+            const symbols = await this.symbolProvider.provideDocumentSymbols(
+                document,
+                new vscode.CancellationTokenSource().token
             );
 
-            if (!symbols) {
+            if (!symbols || symbols.length === 0) {
+                console.log('No symbols found');
                 return [];
             }
 
-            return this.convertToStructureNodes(symbols);
+            console.log(`Found ${symbols.length} symbols`);
+            const nodes = this.convertSymbolsToNodes(symbols);
+            console.log('Converted nodes:', nodes);
+            
+            return nodes;
+
         } catch (error) {
             console.error('Error parsing file structure:', error);
             return [];
         }
     }
 
-    private static convertToStructureNodes(symbols: vscode.DocumentSymbol[]): IStructureNode[] {
-        return symbols.map(symbol => ({
-            name: symbol.name,
-            detail: symbol.detail,
-            range: symbol.range,
-            kind: symbol.kind,
-            children: symbol.children && symbol.children.length > 0
-                ? this.convertToStructureNodes(symbol.children)
-                : undefined
-        }));
+    private static convertSymbolsToNodes(symbols: vscode.DocumentSymbol[]): IStructureNode[] {
+        return symbols
+            .filter(symbol => this.typeScriptKinds.has(symbol.kind))
+            .reduce<IStructureNode[]>((acc, symbol) => {
+                const type = this.typeScriptKinds.get(symbol.kind);
+                if (type) {
+                    const node: IStructureNode = {
+                        name: symbol.name,
+                        type: type,
+                        range: symbol.range,
+                    };
+
+                    if (symbol.children?.length > 0) {
+                        node.children = this.convertSymbolsToNodes(symbol.children);
+                    }
+
+                    acc.push(node);
+                }
+                return acc;
+            }, []);
     }
 }
