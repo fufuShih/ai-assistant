@@ -43,20 +43,10 @@ export class CurrentFileProvider implements vscode.TreeDataProvider<StructureTre
     }
 
     private async updateStructure() {
-        if (this.currentDocument && this.isRelevantDocument(this.currentDocument)) {
+        if (this.currentDocument) {
             this.nodes = await FileStructureParser.parse(this.currentDocument);
             this._onDidChangeTreeData.fire();
         }
-    }
-
-    private isRelevantDocument(document: vscode.TextDocument): boolean {
-        const supportedLanguages = [
-            'typescript',
-            'typescriptreact',
-            'javascript',
-            'javascriptreact'
-        ];
-        return supportedLanguages.includes(document.languageId);
     }
 
     getTreeItem(element: StructureTreeItem): vscode.TreeItem {
@@ -82,8 +72,8 @@ class StructureTreeItem extends vscode.TreeItem {
                 : vscode.TreeItemCollapsibleState.None
         );
 
-        this.tooltip = `${node.type}: ${node.name}`;
-        this.description = node.type;
+        this.tooltip = node.detail ? `${node.type}: ${node.name}\n${node.detail}` : `${node.type}: ${node.name}`;
+        this.description = node.detail || node.type;
         this.iconPath = this.getIconForType(node.type);
         
         this.command = {
@@ -107,6 +97,12 @@ class StructureTreeItem extends vscode.TreeItem {
                 return new vscode.ThemeIcon('symbol-namespace');
             case 'enum':
                 return new vscode.ThemeIcon('symbol-enum');
+            case 'todo':
+                return new vscode.ThemeIcon('tasklist');
+            case 'fixme':
+                return new vscode.ThemeIcon('warning');
+            case 'note':
+                return new vscode.ThemeIcon('note');
             default:
                 return new vscode.ThemeIcon('symbol-misc');
         }
